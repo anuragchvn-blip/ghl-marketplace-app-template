@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       agency = await prisma.agency.create({
         data: {
           name: 'Default Agency',
+          ghlCompanyId: companyId,
         },
       })
     }
@@ -46,7 +47,31 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    // Also create/update User for dashboard access
+    const resourceId = locationId || companyId
+    await prisma.user.upsert({
+      where: { resourceId },
+      create: {
+        resourceId,
+        userType: locationId ? 'location' : 'company',
+        locationId,
+        companyId,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenType: tokens.token_type || 'Bearer',
+        expiresIn: tokens.expires_in,
+        scope: tokens.scope || '',
+      },
+      update: {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        tokenType: tokens.token_type || 'Bearer',
+        expiresIn: tokens.expires_in,
+        scope: tokens.scope || '',
+      },
+    })
+
+    return NextResponse.redirect(new URL(`/dashboard?locationId=${resourceId}`, request.url))
   } catch (error) {
     console.error('GHL Auth Error:', error)
     return NextResponse.json({ error: 'Authentication failed' }, { status: 500 })

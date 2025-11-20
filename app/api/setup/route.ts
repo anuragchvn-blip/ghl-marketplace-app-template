@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const { agencyName = 'Default Agency', subAccountName = 'Test Location' } = await request.json()
+    const { agencyName = 'Default Agency' } = await request.json()
 
     // Create or get agency
     let agency = await prisma.agency.findFirst()
@@ -12,9 +12,6 @@ export async function POST(request: NextRequest) {
       agency = await prisma.agency.create({
         data: {
           name: agencyName,
-          logo: null,
-          primaryColor: '#0066FF',
-          secondaryColor: '#FF6B35',
         },
       })
     }
@@ -25,7 +22,8 @@ export async function POST(request: NextRequest) {
         agencyId: agency.id,
         ghlLocationId: `test-location-${Date.now()}`,
         ghlCompanyId: `test-company-${Date.now()}`,
-        name: subAccountName,
+        ghlAccessToken: 'test-token',
+        ghlRefreshToken: 'test-refresh-token',
       },
     })
 

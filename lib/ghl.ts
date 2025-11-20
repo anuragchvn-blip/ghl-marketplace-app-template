@@ -51,7 +51,7 @@ export class GHLService {
 
     // Check if token expired
     if (subAccount.tokenExpiresAt && new Date() >= subAccount.tokenExpiresAt) {
-      const newTokens = await this.refreshAccessToken(subAccount.ghlRefreshToken!)
+      const newTokens = await this.refreshAccessToken(subAccount.ghlRefreshToken)
       
       await prisma.subAccount.update({
         where: { id: subAccountId },

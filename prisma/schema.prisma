@@ -7,6 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Agency {
+  id              String          @id @default(cuid())
+  name            String
+  ghlCompanyId    String?         @unique
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  subAccounts     SubAccount[]
+
+  @@index([ghlCompanyId])
+}
+
+model SubAccount {
+  id              String          @id @default(cuid())
+  agencyId        String
+  ghlLocationId   String          @unique
+  ghlCompanyId    String?
+  ghlAccessToken  String
+  ghlRefreshToken String
+  tokenExpiresAt  DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  agency          Agency          @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId])
+  @@index([ghlLocationId])
+  @@index([ghlCompanyId])
+}
+
 model User {
   id                    String          @id @default(cuid())
   resourceId            String          @unique
