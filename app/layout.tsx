@@ -17,12 +17,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'OutreachOS - AI-Powered Lead Generation',
   description: 'The Operating System for Local Lead Generation - AI-powered Google Maps scraping with automatic lead scoring',
-  icons: {
-    icon: [
-      { url: '/favicon.ico' },
-      { url: '/icon.png', type: 'image/png' },
-    ],
-    apple: '/apple-icon.png',
+  applicationName: 'OutreachOS',
+  keywords: ['lead generation', 'AI', 'Google Maps', 'business leads', 'outreach', 'CRM', 'GHL'],
+  authors: [{ name: 'OutreachOS' }],
+  creator: 'OutreachOS',
+  openGraph: {
+    title: 'OutreachOS - AI-Powered Lead Generation',
+    description: 'The Operating System for Local Lead Generation',
+    type: 'website',
   },
 }
 
