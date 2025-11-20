@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(_req: NextRequest) {
   try {
     // Simple admin authentication check
-    const authHeader = req.headers.get('authorization')
-    const isLocalhost = req.headers.get('host')?.includes('localhost')
+    const authHeader = _req.headers.get('authorization')
+    const isLocalhost = _req.headers.get('host')?.includes('localhost')
     
     // Allow on localhost, or check session storage flag (handled by client)
     if (!isLocalhost && authHeader !== `Bearer ${process.env.ADMIN_SECRET_KEY}`) {
