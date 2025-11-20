@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
       message: 'User data deleted successfully',
       resourceId 
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If user not found, that's okay (already deleted)
-    if (error.code === 'P2025') {
+    if ((error as { code?: string }).code === 'P2025') {
       console.log('User already deleted or not found')
       return NextResponse.json({ success: true, message: 'User not found' })
     }

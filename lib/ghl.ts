@@ -80,7 +80,18 @@ export class GHLService {
     })
   }
 
-  async pushContactToGHL(subAccountId: string, lead: any) {
+  async pushContactToGHL(subAccountId: string, lead: {
+    ownerName?: string;
+    email?: string;
+    phone?: string;
+    businessName?: string;
+    website?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    aiScore?: number;
+  }) {
     const api = await this.getAxiosInstance(subAccountId)
 
     const response = await api.post('/contacts/', {
@@ -95,7 +106,7 @@ export class GHLService {
       state: lead.state,
       postalCode: lead.zipCode,
       customField: {
-        aiScore: lead.aiScore.toString(),
+        aiScore: lead.aiScore?.toString() || '',
         leadSource: 'Outreach OS',
       },
     })
