@@ -7,11 +7,17 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
+    // Get locationId from query params
+    const { searchParams } = new URL(req.url)
+    const locationId = searchParams.get('locationId')
+    
+    console.log('Create Order - LocationId:', locationId)
+    console.log('Create Order - URL:', req.url)
+    
     // Get authenticated user
     const session = await getGHLSession(req)
     
     console.log('Create Order - Session:', session)
-    console.log('Create Order - URL:', req.url)
     
     if (!session) {
       return NextResponse.json({ 
@@ -48,6 +54,7 @@ export async function POST(req: NextRequest) {
         status: 'pending',
         leadsLimit: parseInt(process.env.DAY_PASS_LEADS_LIMIT || '15'),
         expiresAt,
+        metadata: locationId ? { locationId } : undefined,
       },
     })
 

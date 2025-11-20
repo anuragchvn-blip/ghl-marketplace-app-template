@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=error`)
     }
 
+    // Get locationId from purchase metadata
+    const locationId = (purchase.metadata as any)?.locationId || ''
+
     // Update purchase status
     await prisma.dayPassPurchase.update({
       where: { id: purchase.id },
@@ -53,7 +56,11 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`)
+    const redirectUrl = locationId 
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success&locationId=${locationId}`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=success`
+    
+    return NextResponse.redirect(redirectUrl)
   } catch (error: unknown) {
     console.error('Capture Payment Error:', error)
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/dashboard?payment=error`)
