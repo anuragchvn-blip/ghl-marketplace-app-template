@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String          @id @default(cuid())
+  resourceId            String          @unique
+  userType              String
+  companyId             String?
+  locationId            String?
+  accessToken           String
+  refreshToken          String
+  tokenType             String          @default("Bearer")
+  expiresIn             Int
+  scope                 String
+  googleAccessToken     String?
+  googleRefreshToken    String?
+  googleEmail           String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  
+  ghlContacts           GhlContact[]
+  ghlPipelines          GhlPipeline[]
+  ghlOpportunities      GhlOpportunity[]
+  calendarEvents        CalendarEvent[]
+
+  @@index([resourceId])
+  @@index([companyId])
+  @@index([locationId])
+}
+
+model Lead {
+  id              String          @id @default(cuid())
+  businessName    String
+  category        String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  phone           String?
+  website         String?
+  rating          Float?
+  reviewCount     Int?
+  latitude        Float?
+  longitude       Float?
+  aiScore         Int             @default(0)
+  aiReasoning     String?
+  status          String          @default("NEW")
+  pushedToGhl     Boolean         @default(false)
+  ghlContactId    String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  calendarEvents  CalendarEvent[]
+
+  @@index([aiScore])
+  @@index([status])
+  @@index([ghlContactId])
+  @@index([createdAt])
+}
+
+model GhlContact {
+  id              String          @id @default(cuid())
+  userId          String
+  ghlContactId    String          @unique
+  locationId      String
+  firstName       String?
+  lastName        String?
+  email           String?
+  phone           String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  postalCode      String?
+  website         String?
+  source          String?
+  tags            String?
+  customFields    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunities   GhlOpportunity[]
+
+  @@index([userId])
+  @@index([ghlContactId])
+  @@index([locationId])
+  @@index([email])
+}
+
+model GhlPipeline {
+  id              String          @id @default(cuid())
+  userId          String
+  ghlPipelineId   String          @unique
+  locationId      String
+  name            String
+  stages          String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunities   GhlOpportunity[]
+
+  @@index([userId])
+  @@index([ghlPipelineId])
+  @@index([locationId])
+}
+
+model GhlOpportunity {
+  id              String          @id @default(cuid())
+  userId          String
+  ghlOpportunityId String         @unique
+  contactId       String
+  pipelineId      String
+  locationId      String
+  name            String
+  monetaryValue   Float?
+  status          String
+  stageId         String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact         GhlContact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  pipeline        GhlPipeline     @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([ghlOpportunityId])
+  @@index([contactId])
+  @@index([pipelineId])
+  @@index([locationId])
+  @@index([status])
+}
+
+model CalendarEvent {
+  id              String          @id @default(cuid())
+  userId          String
+  leadId          String?
+  googleEventId   String?
+  ghlCalendarId   String?
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime
+  attendees       String?
+  meetLink        String?
+  location        String?
+  status          String          @default("scheduled")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead            Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([googleEventId])
+  @@index([ghlCalendarId])
+  @@index([startTime])
+  @@index([status])
+}
