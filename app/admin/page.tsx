@@ -173,46 +173,46 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-8 py-12 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12 space-y-6 sm:space-y-8">
         {/* Stats Grid */}
         {stats && (
-          <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
+              className="p-4 sm:p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
             >
-              <Users className="w-8 h-8 text-primary mb-3" />
-              <div className="text-3xl font-serif font-semibold text-stardust mb-1">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary mb-2 sm:mb-3" />
+              <div className="text-2xl sm:text-3xl font-serif font-semibold text-stardust mb-1">
                 {stats.totalUsers}
               </div>
-              <div className="text-sm text-stardust/60">Total Users</div>
+              <div className="text-xs sm:text-sm text-stardust/60">Total Users</div>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
+              className="p-4 sm:p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
             >
-              <Zap className="w-8 h-8 text-green-400 mb-3" />
-              <div className="text-3xl font-serif font-semibold text-stardust mb-1">
+              <Zap className="w-6 h-6 sm:w-8 sm:h-8 text-green-400 mb-2 sm:mb-3" />
+              <div className="text-2xl sm:text-3xl font-serif font-semibold text-stardust mb-1">
                 {stats.activeUsers}
               </div>
-              <div className="text-sm text-stardust/60">Active Users</div>
+              <div className="text-xs sm:text-sm text-stardust/60">Active Users</div>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
+              className="p-4 sm:p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
             >
-              <DollarSign className="w-8 h-8 text-yellow-400 mb-3" />
-              <div className="text-3xl font-serif font-semibold text-stardust mb-1">
+              <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 mb-2 sm:mb-3" />
+              <div className="text-2xl sm:text-3xl font-serif font-semibold text-stardust mb-1">
                 ${stats.totalRevenue}
               </div>
-              <div className="text-sm text-stardust/60">Total Revenue</div>
+              <div className="text-xs sm:text-sm text-stardust/60">Total Revenue</div>
             </motion.div>
 
             <motion.div

@@ -15,8 +15,15 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Outreach OS',
-  description: 'The Operating System for Local Lead Generation',
+  title: 'OutreachOS - AI-Powered Lead Generation',
+  description: 'The Operating System for Local Lead Generation - AI-powered Google Maps scraping with automatic lead scoring',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    apple: '/apple-icon.png',
+  },
 }
 
 export default function RootLayout({

@@ -61,6 +61,11 @@ export default function Dashboard() {
   const [noteText, setNoteText] = useState('')
   const [dayPassStatus, setDayPassStatus] = useState<DayPassStatus | null>(null)
   const [purchasingPass, setPurchasingPass] = useState(false)
+  
+  // Get locationId from URL params
+  const locationId = typeof window !== 'undefined' 
+    ? new URLSearchParams(window.location.search).get('locationId') || 'test-location-123'
+    : 'test-location-123'
 
   useEffect(() => {
     fetchLeads()
@@ -83,7 +88,7 @@ export default function Dashboard() {
 
   const fetchLeads = async () => {
     try {
-      const response = await fetch('/api/leads')
+      const response = await fetch(`/api/leads?locationId=${locationId}`)
       const data = await response.json()
       if (data.leads) {
         setLeads(data.leads.sort((a: Lead, b: Lead) => b.aiScore - a.aiScore))
@@ -95,7 +100,7 @@ export default function Dashboard() {
 
   const fetchDayPassStatus = async () => {
     try {
-      const response = await fetch('/api/user/day-pass')
+      const response = await fetch(`/api/user/day-pass?locationId=${locationId}`)
       const data = await response.json()
       setDayPassStatus(data)
     } catch (error) {
@@ -106,7 +111,7 @@ export default function Dashboard() {
   const handleBuyDayPass = async () => {
     setPurchasingPass(true)
     try {
-      const response = await fetch('/api/paypal/create-order', {
+      const response = await fetch(`/api/paypal/create-order?locationId=${locationId}`, {
         method: 'POST',
       })
       const data = await response.json()
@@ -158,7 +163,7 @@ export default function Dashboard() {
     setLeads([])
 
     try {
-      const response = await fetch('/api/leads/scrape', {
+      const response = await fetch(`/api/leads/scrape?locationId=${locationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ searchQuery: query, location, maxResults, minRating }),
@@ -207,7 +212,7 @@ export default function Dashboard() {
   const handlePushToGHL = async (leadId: string) => {
     setPushingLead(leadId)
     try {
-      const response = await fetch('/api/leads/push', {
+      const response = await fetch(`/api/leads/push?locationId=${locationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId }),
@@ -237,7 +242,7 @@ export default function Dashboard() {
     if (!datetime) return
 
     try {
-      const response = await fetch('/api/google/schedule', {
+      const response = await fetch(`/api/google/schedule?locationId=${locationId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -272,7 +277,7 @@ export default function Dashboard() {
 
   const handleSaveNote = async (leadId: string) => {
     try {
-      const response = await fetch(`/api/leads/${leadId}/note`, {
+      const response = await fetch(`/api/leads/${leadId}/note?locationId=${locationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: noteText }),
@@ -298,13 +303,30 @@ export default function Dashboard() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <div className="md:hidden border-b border-white/10 bg-void/50 backdrop-blur-xl sticky top-0 z-50 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <span className="font-serif text-lg text-stardust font-medium">Outreach OS</span>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+          >
+            {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+      </div>
+
+      {/* Sidebar - Desktop & Mobile */}
       <motion.aside 
         initial={{ width: 240 }}
-        animate={{ width: isSidebarOpen ? 240 : 80 }}
-        className="border-r border-white/10 bg-void/50 backdrop-blur-xl z-50 flex flex-col sticky top-0 h-screen"
+        animate={{ 
+          width: isSidebarOpen ? 240 : 80,
+          x: isSidebarOpen ? 0 : -240
+        }}
+        className={`${isSidebarOpen ? 'fixed md:relative' : 'hidden md:flex'} inset-0 md:inset-auto border-r border-white/10 bg-void/50 backdrop-blur-xl z-40 md:z-50 flex-col md:sticky top-0 h-screen`}
       >
-        <div className="p-6 flex items-center justify-between">
+        <div className="hidden md:flex p-6 items-center justify-between">
           {isSidebarOpen && (
             <motion.span 
               initial={{ opacity: 0 }}
@@ -327,7 +349,7 @@ export default function Dashboard() {
             <Home size={20} />
             {isSidebarOpen && <span>Dashboard</span>}
           </Link>
-          <Link href="/settings" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-stardust/60 hover:text-stardust rounded-lg transition-colors">
+          <Link href={`/settings?locationId=${locationId}`} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-stardust/60 hover:text-stardust rounded-lg transition-colors">
             <Settings size={20} />
             {isSidebarOpen && <span>Settings</span>}
           </Link>
@@ -344,29 +366,41 @@ export default function Dashboard() {
         </div>
       </motion.aside>
 
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 z-30"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       <main className="flex-1 overflow-auto">
-        <div className="border-b border-white/10 bg-void/30 backdrop-blur-xl sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
-            <div>
-              <h1 className="font-serif text-3xl font-semibold text-stardust mb-2">Lead Discovery</h1>
-              <p className="text-stardust/60 text-sm">Find and score high-quality leads with AI</p>
+        <div className="border-b border-white/10 bg-void/30 backdrop-blur-xl sticky top-0 md:top-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="w-full sm:w-auto">
+              <h1 className="font-serif text-2xl sm:text-3xl font-semibold text-stardust mb-1 sm:mb-2">Lead Discovery</h1>
+              <p className="text-stardust/60 text-xs sm:text-sm">Find and score high-quality leads with AI</p>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
               {dayPassStatus?.dayPassActive ? (
-                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <Zap className="w-4 h-4 text-green-400" />
-                  <span className="text-sm text-green-400">
-                    {dayPassStatus.dayPassLeadsUsed}/{dayPassStatus.dayPassLeadsLimit} leads
-                  </span>
-                  <Clock className="w-4 h-4 text-green-400 ml-2" />
-                  <span className="text-sm text-green-400">{getTimeRemaining()}</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3 sm:px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-green-400" />
+                    <span className="text-xs sm:text-sm text-green-400">
+                      {dayPassStatus.dayPassLeadsUsed}/{dayPassStatus.dayPassLeadsLimit} leads
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-green-400" />
+                    <span className="text-xs sm:text-sm text-green-400">{getTimeRemaining()}</span>
+                  </div>
                 </div>
               ) : (
                 <button
                   onClick={handleBuyDayPass}
                   disabled={purchasingPass}
-                  className="px-6 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                  className="px-4 sm:px-6 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 text-sm w-full sm:w-auto"
                 >
                   {purchasingPass ? 'Processing...' : 'Buy Day Pass - $7'}
                 </button>
@@ -374,21 +408,21 @@ export default function Dashboard() {
               
               <button
                 onClick={connectGoogleCalendar}
-                className="px-4 py-2 bg-primary/10 border border-primary/20 text-primary-light rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2"
+                className="hidden sm:flex px-4 py-2 bg-primary/10 border border-primary/20 text-primary-light rounded-lg hover:bg-primary/20 transition-colors items-center gap-2 text-sm"
               >
                 <Calendar size={16} />
-                <span className="text-sm">Sync Calendar</span>
+                <span>Sync Calendar</span>
               </button>
               
-              <div className="text-right">
-                <div className="text-2xl font-serif font-semibold text-stardust">{leads.length}</div>
+              <div className="text-center sm:text-right">
+                <div className="text-xl sm:text-2xl font-serif font-semibold text-stardust">{leads.length}</div>
                 <div className="text-xs text-stardust/60">Total Leads</div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-8 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
           {showFeatures && leads.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -439,31 +473,31 @@ export default function Dashboard() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             onSubmit={handleSubmit}
-            className="mb-12 p-8 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
+            className="mb-8 sm:mb-12 p-4 sm:p-6 lg:p-8 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
           >
-            <h2 className="font-serif text-2xl font-semibold text-stardust mb-6">Scrape New Leads</h2>
+            <h2 className="font-serif text-xl sm:text-2xl font-semibold text-stardust mb-4 sm:mb-6">Scrape New Leads</h2>
             
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
               <div>
-                <label className="block text-sm text-stardust/80 mb-2">Business Type</label>
+                <label className="block text-xs sm:text-sm text-stardust/80 mb-2">Business Type</label>
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g., restaurants, plumbers, dentists"
-                  className="w-full px-4 py-3 bg-void border border-white/10 rounded-lg text-stardust placeholder:text-stardust/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  placeholder="e.g., restaurants, plumbers"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-void border border-white/10 rounded-lg text-stardust placeholder:text-stardust/40 focus:outline-none focus:border-primary/50 transition-colors text-sm sm:text-base"
                   required
                 />
               </div>
               
               <div>
-                <label className="block text-sm text-stardust/80 mb-2">Location</label>
+                <label className="block text-xs sm:text-sm text-stardust/80 mb-2">Location</label>
                 <input
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="e.g., Miami, FL"
-                  className="w-full px-4 py-3 bg-void border border-white/10 rounded-lg text-stardust placeholder:text-stardust/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-void border border-white/10 rounded-lg text-stardust placeholder:text-stardust/40 focus:outline-none focus:border-primary/50 transition-colors text-sm sm:text-base"
                   required
                 />
               </div>
