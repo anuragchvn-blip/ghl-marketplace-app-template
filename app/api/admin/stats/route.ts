@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: NextRequest) {
+export const dynamic = 'force-dynamic'
+
+export async function GET(_req: NextRequest) {
   try {
     // Simple admin authentication check
     const authHeader = req.headers.get('authorization')

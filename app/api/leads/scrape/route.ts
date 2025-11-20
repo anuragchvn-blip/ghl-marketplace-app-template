@@ -8,6 +8,8 @@ import { MockScraper } from '@/lib/mock-scraper'
 import { AIScorer } from '@/lib/ai-scorer'
 import { getGHLSession } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated GHL user
