@@ -6,9 +6,47 @@ import { OutscraperScraper } from '@/lib/outscraper-scraper'
 import { SerpAPIScraper } from '@/lib/serpapi-scraper'
 import { MockScraper } from '@/lib/mock-scraper'
 import { AIScorer } from '@/lib/ai-scorer'
+import { getGHLSession } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    // Get authenticated GHL user
+    const session = await getGHLSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check day pass status
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        dayPassActive: true,
+        dayPassExpiresAt: true,
+        dayPassLeadsUsed: true,
+        dayPassLeadsLimit: true,
+      },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Validate day pass
+    if (!user.dayPassActive || !user.dayPassExpiresAt || user.dayPassExpiresAt < new Date()) {
+      return NextResponse.json(
+        { error: 'No active day pass. Please purchase a day pass to scrape leads.' },
+        { status: 403 }
+      )
+    }
+
+    if (user.dayPassLeadsUsed >= user.dayPassLeadsLimit) {
+      return NextResponse.json(
+        { error: 'Daily lead limit reached. Please purchase a new day pass.' },
+        { status: 403 }
+      )
+    }
+
+    const currentUserId = session.userId
     const { searchQuery, location, maxResults = 15 } = await request.json()
 
     if (!searchQuery || !location) {
@@ -108,6 +146,16 @@ export async function POST(request: NextRequest) {
 
               // Only save and return leads with score >= 75
               if (scoringResult.score >= 75) {
+                // Check if user has reached their limit
+                const currentUser = await prisma.user.findUnique({
+                  where: { id: currentUserId },
+                  select: { dayPassLeadsUsed: true, dayPassLeadsLimit: true },
+                })
+
+                if (currentUser && currentUser.dayPassLeadsUsed >= currentUser.dayPassLeadsLimit) {
+                  return // Skip this lead, limit reached
+                }
+
                 // Check for existing lead to avoid duplicates
                 const existingLead = await prisma.lead.findFirst({
                   where: {
@@ -118,6 +166,7 @@ export async function POST(request: NextRequest) {
 
                 let savedLead
                 const leadDataToSave = {
+                  userId: currentUserId,
                   businessName: lead.businessName,
                   category: lead.category,
                   address: lead.address,
@@ -145,6 +194,12 @@ export async function POST(request: NextRequest) {
                     data: leadDataToSave,
                   })
                 }
+
+                // Increment user's leads used count
+                await prisma.user.update({
+                  where: { id: currentUserId },
+                  data: { dayPassLeadsUsed: { increment: 1 } },
+                })
 
                 const leadData = JSON.stringify({
                   type: 'lead',

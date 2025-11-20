@@ -5,6 +5,11 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+  webpack: (config, { isServer }) => {
+    // Disable webpack caching to fix persistent cache corruption
+    config.cache = false
+    return config
+  },
   env: {
     GHL_APP_CLIENT_ID: process.env.GHL_APP_CLIENT_ID,
     GHL_APP_CLIENT_SECRET: process.env.GHL_APP_CLIENT_SECRET,

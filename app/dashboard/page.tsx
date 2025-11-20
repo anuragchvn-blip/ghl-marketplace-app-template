@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { MapPin, Sparkles, Send, Target, Calendar, Menu, X, Home, Settings, LogOut } from 'lucide-react'
+import { Sparkles, Send, Target, Calendar, Menu, X, Home, Settings, LogOut, Zap, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 interface Lead {
@@ -18,6 +18,15 @@ interface Lead {
   aiReasoning: string | null
   notes: string | null
   updatedAt: string
+}
+
+interface DayPassStatus {
+  dayPassActive: boolean
+  dayPassExpiresAt: string | null
+  dayPassLeadsUsed: number
+  dayPassLeadsLimit: number
+  totalDayPassesPurchased: number
+  expired?: boolean
 }
 
 const features = [
@@ -50,9 +59,26 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [editingNote, setEditingNote] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
+  const [dayPassStatus, setDayPassStatus] = useState<DayPassStatus | null>(null)
+  const [purchasingPass, setPurchasingPass] = useState(false)
 
   useEffect(() => {
     fetchLeads()
+    fetchDayPassStatus()
+    
+    const urlParams = new URLSearchParams(window.location.search)
+    const paymentStatus = urlParams.get('payment')
+    if (paymentStatus === 'success') {
+      alert('✅ Day Pass activated! You now have access to 15 high-converting leads.')
+      fetchDayPassStatus()
+      window.history.replaceState({}, '', '/dashboard')
+    } else if (paymentStatus === 'cancelled') {
+      alert('❌ Payment cancelled.')
+      window.history.replaceState({}, '', '/dashboard')
+    } else if (paymentStatus === 'error') {
+      alert('⚠️ Payment error. Please try again.')
+      window.history.replaceState({}, '', '/dashboard')
+    }
   }, [])
 
   const fetchLeads = async () => {
@@ -67,10 +93,69 @@ export default function Dashboard() {
     }
   }
 
+  const fetchDayPassStatus = async () => {
+    try {
+      const response = await fetch('/api/user/day-pass')
+      const data = await response.json()
+      setDayPassStatus(data)
+    } catch (error) {
+      console.error('Failed to fetch day pass status:', error)
+    }
+  }
+
+  const handleBuyDayPass = async () => {
+    setPurchasingPass(true)
+    try {
+      const response = await fetch('/api/paypal/create-order', {
+        method: 'POST',
+      })
+      const data = await response.json()
+      
+      if (data.error) {
+        alert(data.error)
+        setPurchasingPass(false)
+        return
+      }
+
+      if (data.approvalUrl) {
+        window.location.href = data.approvalUrl
+      }
+    } catch (error) {
+      console.error('Failed to create order:', error)
+      alert('Failed to start payment. Please try again.')
+      setPurchasingPass(false)
+    }
+  }
+
+  const getTimeRemaining = () => {
+    if (!dayPassStatus?.dayPassExpiresAt) return null
+    const now = new Date().getTime()
+    const expires = new Date(dayPassStatus.dayPassExpiresAt).getTime()
+    const diff = expires - now
+    
+    if (diff <= 0) return 'Expired'
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    
+    return `${hours}h ${minutes}m`
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!dayPassStatus?.dayPassActive) {
+      alert('⚠️ Please purchase a Day Pass to scrape leads.')
+      return
+    }
+    
+    if (dayPassStatus.dayPassLeadsUsed >= dayPassStatus.dayPassLeadsLimit) {
+      alert('⚠️ You have reached your daily limit. Purchase a new Day Pass to continue.')
+      return
+    }
+    
     setLoading(true)
-    setLeads([]) // Clear previous leads
+    setLeads([])
 
     try {
       const response = await fetch('/api/leads/scrape', {
@@ -92,7 +177,7 @@ export default function Dashboard() {
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // Keep the last incomplete line in buffer
+        buffer = lines.pop() || ''
 
         for (const line of lines) {
           if (!line.trim()) continue
@@ -122,16 +207,18 @@ export default function Dashboard() {
   const handlePushToGHL = async (leadId: string) => {
     setPushingLead(leadId)
     try {
-      const response = await fetch('/api/leads/push-to-ghl', {
+      const response = await fetch('/api/leads/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId }),
       })
 
+      const data = await response.json()
       if (response.ok) {
-        alert('Lead pushed to GHL successfully!')
+        alert('✅ Lead pushed to GHL successfully!')
+        fetchLeads()
       } else {
-        alert('Failed to push lead to GHL')
+        alert(data.error || 'Failed to push lead')
       }
     } catch (error) {
       console.error('Push error:', error)
@@ -203,7 +290,6 @@ export default function Dashboard() {
     }
   }
 
-  // Auto-refresh leads every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchLeads()
@@ -213,7 +299,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
-      {/* Sidebar Navigation */}
       <motion.aside 
         initial={{ width: 240 }}
         animate={{ width: isSidebarOpen ? 240 : 80 }}
@@ -242,7 +327,7 @@ export default function Dashboard() {
             <Home size={20} />
             {isSidebarOpen && <span>Dashboard</span>}
           </Link>
-          <Link href="/settings" className="w-full flex items-center gap-3 px-4 py-3 text-foreground hover:text-stardust hover:bg-white/5 rounded-lg transition-colors">
+          <Link href="/settings" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5 text-stardust/60 hover:text-stardust rounded-lg transition-colors">
             <Settings size={20} />
             {isSidebarOpen && <span>Settings</span>}
           </Link>
@@ -251,7 +336,7 @@ export default function Dashboard() {
         <div className="p-4 border-t border-white/10">
           <button 
             onClick={() => window.location.href = '/api/auth/logout'}
-            className="w-full flex items-center gap-3 px-4 py-3 text-foreground hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            className="flex items-center gap-3 px-4 py-3 w-full hover:bg-red-500/10 text-red-400 rounded-lg transition-colors"
           >
             <LogOut size={20} />
             {isSidebarOpen && <span>Disconnect</span>}
@@ -259,286 +344,284 @@ export default function Dashboard() {
         </div>
       </motion.aside>
 
-      {/* Main Content */}
-      <main className="flex-1 relative overflow-hidden">
-        {/* Header */}
-        <header className="border-b border-white/10 bg-void/50 backdrop-blur-md sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-serif text-stardust">Mission Control</h1>
+      <main className="flex-1 overflow-auto">
+        <div className="border-b border-white/10 bg-void/30 backdrop-blur-xl sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-8 py-6 flex items-center justify-between">
+            <div>
+              <h1 className="font-serif text-3xl font-semibold text-stardust mb-2">Lead Discovery</h1>
+              <p className="text-stardust/60 text-sm">Find and score high-quality leads with AI</p>
             </div>
+            
             <div className="flex items-center gap-4">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              {dayPassStatus?.dayPassActive ? (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <Zap className="w-4 h-4 text-green-400" />
+                  <span className="text-sm text-green-400">
+                    {dayPassStatus.dayPassLeadsUsed}/{dayPassStatus.dayPassLeadsLimit} leads
+                  </span>
+                  <Clock className="w-4 h-4 text-green-400 ml-2" />
+                  <span className="text-sm text-green-400">{getTimeRemaining()}</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleBuyDayPass}
+                  disabled={purchasingPass}
+                  className="px-6 py-2 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {purchasingPass ? 'Processing...' : 'Buy Day Pass - $7'}
+                </button>
+              )}
+              
+              <button
                 onClick={connectGoogleCalendar}
-                className="px-4 py-2 rounded-full bg-white/5 border border-white/10 hover:border-primary/50 text-sm font-medium transition-all flex items-center gap-2"
+                className="px-4 py-2 bg-primary/10 border border-primary/20 text-primary-light rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2"
               >
-                <Calendar className="w-4 h-4 text-primary-light" />
-                <span>Sync Calendar</span>
-              </motion.button>
-              <div className="px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                <span className="text-xs text-primary-light font-medium uppercase tracking-wider">Leads Found</span>
-                <span className="ml-2 text-lg font-bold text-stardust">{leads.length}</span>
+                <Calendar size={16} />
+                <span className="text-sm">Sync Calendar</span>
+              </button>
+              
+              <div className="text-right">
+                <div className="text-2xl font-serif font-semibold text-stardust">{leads.length}</div>
+                <div className="text-xs text-stardust/60">Total Leads</div>
               </div>
             </div>
           </div>
-        </header>
+        </div>
 
         <div className="max-w-7xl mx-auto px-8 py-12">
-          {/* Features section */}
           {showFeatures && leads.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="mb-16"
+              className="mb-12"
             >
-              <div className="text-center mb-12">
-                <h2 className="text-4xl font-serif text-stardust mb-4">System Capabilities</h2>
-                <p className="text-foreground max-w-2xl mx-auto text-lg font-light">
-                  Deploy autonomous agents to scout, analyze, and engage with high-value targets across the digital expanse.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {features.map((feature, idx) => (
+              <div className="grid md:grid-cols-3 gap-6 mb-8">
+                {features.map((feature, i) => (
                   <motion.div
-                    key={idx}
+                    key={i}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 * idx }}
-                    className="bg-surface border border-white/5 rounded-xl p-6 hover:border-primary/30 transition-all duration-300 group"
+                    transition={{ delay: 0.3 + i * 0.1 }}
+                    className="p-6 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm hover:border-primary/30 transition-colors"
                   >
-                    <div className="mb-4 w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                      {feature.icon}
-                    </div>
-                    <h3 className="text-lg font-serif text-stardust mb-2">{feature.title}</h3>
-                    <p className="text-sm text-foreground/80 leading-relaxed">{feature.description}</p>
+                    <div className="text-4xl mb-4">{feature.icon}</div>
+                    <h3 className="font-serif text-xl font-semibold text-stardust mb-2">{feature.title}</h3>
+                    <p className="text-stardust/60 text-sm">{feature.description}</p>
                   </motion.div>
                 ))}
               </div>
+
+              {!dayPassStatus?.dayPassActive && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="p-8 rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5 backdrop-blur-sm"
+                >
+                  <h3 className="font-serif text-2xl font-semibold text-stardust mb-4">White Label Partnership</h3>
+                  <p className="text-stardust/80 mb-6">
+                    Looking for a white-label solution? Contact us for enterprise pricing and custom branding options.
+                  </p>
+                  <a 
+                    href="mailto:anuragchvn1@gmail.com"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <Send size={18} />
+                    Contact for White Label
+                  </a>
+                </motion.div>
+              )}
             </motion.div>
           )}
 
-          {/* Scraping form */}
-          <motion.div
+          <motion.form
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-surface border border-white/5 rounded-xl p-8 mb-8 relative overflow-hidden"
+            onSubmit={handleSubmit}
+            className="mb-12 p-8 rounded-xl border border-white/10 bg-void/50 backdrop-blur-sm"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <h2 className="font-serif text-2xl font-semibold text-stardust mb-6">Scrape New Leads</h2>
             
-            <div className="mb-8 relative z-10">
-              <h2 className="text-2xl font-serif text-stardust mb-2">Initiate Scan</h2>
-              <p className="text-foreground text-sm">Configure scan parameters for target acquisition.</p>
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm text-stardust/80 mb-2">Business Type</label>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g., restaurants, plumbers, dentists"
+                  className="w-full px-4 py-3 bg-void border border-white/10 rounded-lg text-stardust placeholder:text-stardust/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm text-stardust/80 mb-2">Location</label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g., Miami, FL"
+                  className="w-full px-4 py-3 bg-void border border-white/10 rounded-lg text-stardust placeholder:text-stardust/40 focus:outline-none focus:border-primary/50 transition-colors"
+                  required
+                />
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-medium text-foreground uppercase tracking-wider mb-2">
-                    Target Sector
-                  </label>
-                  <div className="relative">
-                    <Target className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
-                    <input
-                      type="text"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="e.g., Dental Clinics"
-                      className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:border-primary/50 text-stardust placeholder-white/20 transition-colors"
-                      required
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground uppercase tracking-wider mb-2">
-                    Target Coordinates
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g., Austin, TX"
-                      className="w-full pl-10 pr-4 py-3 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:border-primary/50 text-stardust placeholder-white/20 transition-colors"
-                      required
-                    />
-                  </div>
-                </div>
+            <div className="grid md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className="block text-sm text-stardust/80 mb-2">Max Results</label>
+                <input
+                  type="number"
+                  value={maxResults}
+                  onChange={(e) => setMaxResults(Number(e.target.value))}
+                  min="1"
+                  max="50"
+                  aria-label="Maximum number of results"
+                  className="w-full px-4 py-3 bg-void border border-white/10 rounded-lg text-stardust focus:outline-none focus:border-primary/50 transition-colors"
+                />
               </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-xs font-medium text-foreground uppercase tracking-wider mb-2">
-                    Max Targets
-                  </label>
-                  <input
-                    type="number"
-                    value={maxResults}
-                    onChange={(e) => setMaxResults(parseInt(e.target.value) || 20)}
-                    min="1"
-                    max="100"
-                    className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:border-primary/50 text-stardust transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground uppercase tracking-wider mb-2">
-                    Min Rating Threshold
-                  </label>
-                  <input
-                    type="number"
-                    value={minRating}
-                    onChange={(e) => setMinRating(parseFloat(e.target.value) || 0)}
-                    min="0"
-                    max="5"
-                    step="0.1"
-                    className="w-full px-4 py-3 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:border-primary/50 text-stardust transition-colors"
-                  />
-                </div>
+              
+              <div>
+                <label className="block text-sm text-stardust/80 mb-2">Minimum Rating</label>
+                <input
+                  type="number"
+                  value={minRating}
+                  onChange={(e) => setMinRating(Number(e.target.value))}
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  aria-label="Minimum business rating"
+                  className="w-full px-4 py-3 bg-void border border-white/10 rounded-lg text-stardust focus:outline-none focus:border-primary/50 transition-colors"
+                />
               </div>
+            </div>
 
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                type="submit"
-                disabled={loading}
-                className="w-full py-4 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-glow"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Scanning Sector...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Execute Scan</span>
-                  </>
-                )}
-              </motion.button>
-            </form>
-          </motion.div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full px-6 py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-3"
+            >
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Scraping...
+                </>
+              ) : (
+                <>
+                  <Target size={20} />
+                  Start Scraping
+                </>
+              )}
+            </button>
+          </motion.form>
 
-          {/* Leads table */}
           {leads.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-surface border border-white/5 rounded-xl overflow-hidden"
+              className="space-y-4"
             >
-              <div className="p-8 border-b border-white/5 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-serif text-stardust mb-1">Acquired Targets</h2>
-                  <p className="text-xs text-foreground uppercase tracking-wider">Sorted by AI Probability Score</p>
-                </div>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-serif text-2xl font-semibold text-stardust">Your Leads</h2>
                 <button
                   onClick={() => setShowFeatures(!showFeatures)}
-                  className="text-xs text-primary-light hover:text-primary transition-colors uppercase tracking-wider font-medium"
+                  className="text-sm text-primary-light hover:text-primary transition-colors"
                 >
-                  {showFeatures ? 'Hide' : 'Show'} Intel
+                  {showFeatures ? 'Hide' : 'Show'} Features
                 </button>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-white/5">
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">Entity</th>
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">Coordinates</th>
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">Comms</th>
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">Rating</th>
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">AI Score</th>
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">Notes</th>
-                      <th className="text-left py-4 px-6 text-xs font-medium text-foreground uppercase tracking-wider">Actions</th>
+                    <tr className="border-b border-white/10">
+                      <th className="px-6 py-4 text-left text-sm font-medium text-stardust/80">Business</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-stardust/80">Contact</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-stardust/80">Rating</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-stardust/80">AI Score</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-stardust/80">Notes</th>
+                      <th className="px-6 py-4 text-left text-sm font-medium text-stardust/80">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {leads.map((lead, index) => (
+                  <tbody>
+                    {leads.map((lead, i) => (
                       <motion.tr
                         key={lead.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="hover:bg-white/5 transition-colors"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
                       >
-                        <td className="py-4 px-6">
+                        <td className="px-6 py-4">
                           <div>
-                            <p className="font-medium text-stardust">{lead.businessName}</p>
-                            <p className="text-xs text-foreground/70 mt-1">{lead.category || 'Unknown Sector'}</p>
+                            <div className="font-medium text-stardust">{lead.businessName}</div>
+                            <div className="text-sm text-stardust/60">{lead.address}</div>
+                            {lead.category && (
+                              <div className="text-xs text-stardust/40 mt-1">{lead.category}</div>
+                            )}
                           </div>
                         </td>
-                        <td className="py-4 px-6 text-sm text-foreground/80">{lead.address || 'N/A'}</td>
-                        <td className="py-4 px-6">
-                          <div className="space-y-1">
-                            {lead.phone && (
-                              <p className="text-sm text-foreground/80">{lead.phone}</p>
-                            )}
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            {lead.phone && <div className="text-stardust">{lead.phone}</div>}
                             {lead.website && (
-                              <a
-                                href={lead.website}
-                                target="_blank"
+                              <a 
+                                href={lead.website} 
+                                target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-xs text-primary-light hover:text-primary hover:underline block"
+                                className="text-primary-light hover:text-primary transition-colors"
                               >
-                                Uplink →
+                                Website
                               </a>
                             )}
                           </div>
                         </td>
-                        <td className="py-4 px-6">
-                          {lead.rating ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-yellow-500 text-sm">★</span>
-                              <span className="text-stardust font-medium">{lead.rating}</span>
+                        <td className="px-6 py-4">
+                          {lead.rating && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-stardust">⭐ {lead.rating.toFixed(1)}</span>
                               {lead.reviewCount && (
-                                <span className="text-foreground/50 text-xs">({lead.reviewCount})</span>
+                                <span className="text-xs text-stardust/60">({lead.reviewCount})</span>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-foreground/30 text-sm">N/A</span>
                           )}
                         </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm border ${
-                              lead.aiScore >= 80
-                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                : lead.aiScore >= 60
-                                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
-                                : 'bg-red-500/10 border-red-500/30 text-red-400'
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                              lead.aiScore >= 80 ? 'bg-green-500/20 text-green-400' :
+                              lead.aiScore >= 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-red-500/20 text-red-400'
                             }`}>
                               {lead.aiScore}
                             </div>
-                            <div className="flex-1 h-1 bg-white/10 rounded-full w-16 overflow-hidden">
-                              <div
-                                style={{ width: `${lead.aiScore}%` }}
-                                className={`h-full ${
-                                  lead.aiScore >= 80
-                                    ? 'bg-emerald-500'
-                                    : lead.aiScore >= 60
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
-                                }`}
-                              />
-                            </div>
+                            {lead.aiReasoning && (
+                              <button
+                                onClick={() => alert(lead.aiReasoning)}
+                                className="text-stardust/60 hover:text-stardust transition-colors"
+                                title="View AI reasoning"
+                              >
+                                <Sparkles size={16} />
+                              </button>
+                            )}
                           </div>
                         </td>
-                        <td className="py-4 px-6 max-w-[200px]">
+                        <td className="px-6 py-4">
                           {editingNote === lead.id ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex gap-2">
                               <input
                                 type="text"
                                 value={noteText}
                                 onChange={(e) => setNoteText(e.target.value)}
+                                className="px-3 py-1 bg-void border border-white/10 rounded text-sm text-stardust focus:outline-none focus:border-primary/50"
                                 placeholder="Add note..."
-                                className="flex-1 bg-cosmic-darker/50 border border-cosmic-lighter/30 rounded px-2 py-1 text-sm text-stardust focus:outline-none focus:border-primary/50"
+                                autoFocus
                               />
                               <button
                                 onClick={() => handleSaveNote(lead.id)}
-                                className="text-primary hover:text-primary/80 text-xs"
+                                className="px-3 py-1 bg-primary/20 text-primary-light rounded text-sm hover:bg-primary/30 transition-colors"
                               >
                                 Save
                               </button>
@@ -547,47 +630,40 @@ export default function Dashboard() {
                                   setEditingNote(null)
                                   setNoteText('')
                                 }}
-                                className="text-stardust/50 hover:text-stardust/80 text-xs"
+                                className="px-3 py-1 bg-white/5 text-stardust/60 rounded text-sm hover:bg-white/10 transition-colors"
                               >
                                 Cancel
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="truncate text-sm text-foreground/80">{lead.notes || 'No notes'}</span>
-                              <button
-                                onClick={() => {
-                                  setEditingNote(lead.id)
-                                  setNoteText(lead.notes || '')
-                                }}
-                                className="text-primary/70 hover:text-primary text-xs"
-                              >
-                                Edit
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingNote(lead.id)
+                                setNoteText(lead.notes || '')
+                              }}
+                              className="text-sm text-stardust/60 hover:text-stardust transition-colors"
+                            >
+                              {lead.notes || 'Add note...'}
+                            </button>
                           )}
                         </td>
-                        <td className="py-4 px-6">
+                        <td className="px-6 py-4">
                           <div className="flex gap-2">
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                            <button
                               onClick={() => handleScheduleMeeting(lead)}
-                              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-stardust transition-colors"
-                              title="Schedule Meeting"
+                              className="px-3 py-1.5 bg-secondary/20 text-secondary-light rounded text-sm hover:bg-secondary/30 transition-colors flex items-center gap-1"
                             >
-                              <Calendar size={16} />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+                              <Calendar size={14} />
+                              Schedule
+                            </button>
+                            <button
                               onClick={() => handlePushToGHL(lead.id)}
                               disabled={pushingLead === lead.id}
-                              className="p-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary-light transition-colors disabled:opacity-50"
-                              title="Push to GHL"
+                              className="px-3 py-1.5 bg-primary/20 text-primary-light rounded text-sm hover:bg-primary/30 transition-colors disabled:opacity-50 flex items-center gap-1"
                             >
-                              <Send size={16} />
-                            </motion.button>
+                              <Send size={14} />
+                              {pushingLead === lead.id ? 'Pushing...' : 'Push to GHL'}
+                            </button>
                           </div>
                         </td>
                       </motion.tr>

@@ -21,21 +21,56 @@ model User {
   googleAccessToken     String?
   googleRefreshToken    String?
   googleEmail           String?
+  
+  // Day Pass System
+  dayPassActive         Boolean         @default(false)
+  dayPassExpiresAt      DateTime?
+  dayPassLeadsUsed      Int             @default(0)
+  dayPassLeadsLimit     Int             @default(15)
+  totalDayPassesPurchased Int           @default(0)
+  
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   
+  leads                 Lead[]
   ghlContacts           GhlContact[]
   ghlPipelines          GhlPipeline[]
   ghlOpportunities      GhlOpportunity[]
   calendarEvents        CalendarEvent[]
+  dayPassPurchases      DayPassPurchase[]
 
   @@index([resourceId])
   @@index([companyId])
   @@index([locationId])
+  @@index([dayPassActive])
+  @@index([dayPassExpiresAt])
+}
+
+model DayPassPurchase {
+  id              String          @id @default(cuid())
+  userId          String
+  paypalOrderId   String          @unique
+  paypalPayerId   String?
+  amount          Float
+  currency        String          @default("USD")
+  status          String          @default("pending")
+  leadsLimit      Int             @default(15)
+  expiresAt       DateTime
+  activatedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([paypalOrderId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Lead {
   id              String          @id @default(cuid())
+  userId          String?         // Which GHL user scraped this lead (optional for existing leads)
   businessName    String
   category        String?
   address         String?
@@ -57,8 +92,10 @@ model Lead {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   
+  user            User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
   calendarEvents  CalendarEvent[]
 
+  @@index([userId])
   @@index([aiScore])
   @@index([status])
   @@index([ghlContactId])
