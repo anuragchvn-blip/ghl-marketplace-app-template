@@ -63,12 +63,20 @@ export async function getGHLSession(request: NextRequest): Promise<GHLSession | 
     const locationId = url.searchParams.get('locationId')
     const companyId = url.searchParams.get('companyId')
     
+    console.log('Auth - URL:', url.toString())
+    console.log('Auth - locationId:', locationId)
+    console.log('Auth - companyId:', companyId)
+    
     if (locationId || companyId) {
       const resourceId = locationId || companyId
+      
+      console.log('Auth - Looking for user with resourceId:', resourceId)
       
       const user = await prisma.user.findUnique({
         where: { resourceId: resourceId! },
       })
+      
+      console.log('Auth - Found user:', user ? user.id : 'null')
       
       if (user) {
         return {
@@ -81,6 +89,7 @@ export async function getGHLSession(request: NextRequest): Promise<GHLSession | 
       }
     }
     
+    console.log('Auth - No session found')
     return null
   } catch (error) {
     console.error('Session error:', error)

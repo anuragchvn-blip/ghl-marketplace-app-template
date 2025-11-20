@@ -9,8 +9,14 @@ export async function POST(req: NextRequest) {
   try {
     // Get authenticated user
     const session = await getGHLSession(req)
+    
+    console.log('Create Order - Session:', session)
+    console.log('Create Order - URL:', req.url)
+    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ 
+        error: 'Unauthorized - Please make sure you are accessing from the dashboard with a valid locationId' 
+      }, { status: 401 })
     }
 
     // Check if user already has an active day pass
